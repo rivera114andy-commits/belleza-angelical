@@ -2,9 +2,11 @@
 const menuToggle = document.getElementById('menuToggle');
 const navLinks = document.querySelector('.nav-links');
 
-menuToggle.addEventListener('click', () => {
-    navLinks.classList.toggle('active');
-});
+if (menuToggle) {
+    menuToggle.addEventListener('click', () => {
+        navLinks.classList.toggle('active');
+    });
+}
 
 // Cerrar menú al hacer click en un enlace
 document.querySelectorAll('.nav-links a').forEach(link => {
@@ -52,41 +54,78 @@ formReserva.addEventListener('submit', (e) => {
         return;
     }
 
-    // Guardar en localStorage (simulación de reserva)
-    const reserva = { nombre, telefono, email, servicio, fecha, hora };
-    const reservas = JSON.parse(localStorage.getItem('reservas') || '[]');
-    reservas.push(reserva);
-    localStorage.setItem('reservas', JSON.stringify(reservas));
+    // Mostrar mensaje de carga
+    mostrarMensaje('⏳ Enviando reserva...', true);
 
-    // Crear el mensaje para WhatsApp
-const miNumero = "573105440765"; // 👈 Pon aquí TU número con el código de país (57 para Colombia) sin el símbolo +
-const textoMensaje = `¡Hola Belleza Angelical! Quiero reservar una cita.%0A%0A*Nombre:* ${nombre}%0A*Teléfono:* ${telefono}%0A*Servicio:* ${servicio}%0A*Fecha:* ${fecha}%0A*Hora:* ${hora}`;
+    // 👇 1. ENVIAR LOS DATOS A RENDER (BACKEND + MONGODB) 👇
+    const urlServidor = 'https://backend-ba.onrender.com/api/reservas'; 
 
-// Abrir WhatsApp en una pestaña nueva
-window.open(`https://wa.me/${miNumero}?text=${textoMensaje}`, '_blank');
-    // Mostrar mensaje
-    mostrarMensaje(
-        `✅ ¡Reserva confirmada!\n${nombre}, te esperamos el ${formatearFecha(fecha)} a las ${hora} para tu ${servicio}.`,
-        true
-    );
+    fetch(urlServidor, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            nombre, 
+            telefono, 
+            email, 
+            servicio, 
+            fecha, 
+            hora 
+        })
+    })
+    .then(response => {
+        if (response.ok) {
+            console.log('Reserva guardada en MongoDB 🎉');
+            
+            // 👇 2. REDIRIGIR A WHATSAPP CON EL MENSAJE 👇
+            const miNumero = "573105440765"; // ⚠️ Pon aquí tu número real sin el +
+            const textoMensaje = `¡Hola Belleza Angelical! Quiero reservar una cita.%0A%0A*Nombre:* ${nombre}%0A*Teléfono:* ${telefono}%0A*Correo:* ${email}%0A*Servicio:* ${servicio}%0A*Fecha:* ${fecha}%0A*Hora:* ${hora}`;
+            
+            // Abrir WhatsApp
+            window.open(`https://wa.me/${miNumero}?text=${textoMensaje}`, '_blank');
 
-    formReserva.reset();
-
-    console.log('📋 Reserva guardada:', reserva);
+            // Mensaje de éxito en la página
+            mostrarMensaje(
+                `✅ ¡Reserva confirmada!\n${nombre}, te esperamos el ${formatearFecha(fecha)} a las ${hora} para tu ${servicio}.`,
+                true
+            );
+            
+            formReserva.reset();
+        } else {
+            throw new Error('Error en el servidor');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        mostrarMensaje('❌ Hubo un error al guardar la reserva. Por favor intenta de nuevo.', false);
+    });
+    // 👆 FIN DEL ENVÍO 👆
 });
 
+// Función para mostrar mensajes en pantalla
 function mostrarMensaje(texto, esExito) {
-    mensaje.textContent = texto;
-    mensaje.className = 'mensaje' + (esExito ? ' exito' : '');
-    mensaje.style.display = 'block';
-    mensaje.style.background = esExito ? '#e8f5e9' : '#ffebee';
-    mensaje.style.color = esExito ? '#2e7d32' : '#c62828';
+    if (!mensaje) return;
     
-    setTimeout(() => {
-        mensaje.style.display = 'none';
-    }, 6000);
+    mensaje.textContent = texto;
+    mensaje.style.display = 'block';
+    mensaje.className = 'mensaje'; // Resetea clases
+    
+    if (esExito) {
+        mensaje.style.background = '#e8f5e9';
+        mensaje.style.color = '#2e7d32';
+    } else {
+        mensaje.style.background = '#ffebee';
+        mensaje.style.color = '#c62828';
+    }
+    
+    // Si es un mensaje de error o éxito final, lo ocultamos en 6 segundos
+    if (texto !== '⏳ Enviando reserva...') {
+        setTimeout(() => {
+            mensaje.style.display = 'none';
+        }, 8000);
+    }
 }
 
+// Formatear fecha AAAA-MM-DD a DD/MM/AAAA
 function formatearFecha(fecha) {
     const [anio, mes, dia] = fecha.split('-');
     return `${dia}/${mes}/${anio}`;
@@ -94,8 +133,10 @@ function formatearFecha(fecha) {
 
 // ========== FECHA MÍNIMA = HOY ==========
 const inputFecha = document.getElementById('fecha');
-const hoy = new Date().toISOString().split('T')[0];
-inputFecha.setAttribute('min', hoy);
+if (inputFecha) {
+    const hoy = new Date().toISOString().split('T')[0];
+    inputFecha.setAttribute('min', hoy);
+}
 
 // ========== ANIMACIÓN AL SCROLL ==========
 const observer = new IntersectionObserver((entries) => {
